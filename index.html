@@ -1,0 +1,209 @@
+<html>
+    <head>
+        <title>webRTC Test</title>
+        <script src='https://sdk-cdn.mypurecloud.com/javascript/27.0.0/purecloud-platform-client-v2.min.js'></script>
+        <script src='https://sdk-cdn.mypurecloud.com/webrtc-sdk/v6/genesys-cloud-webrtc-sdk.bundle.min.js'></script>
+    </head>
+    <body>
+        <button id='register-button' type='button'>Register Me</button>
+        <br><br>
+        <input id="destNum" value="">
+        <button id='makecall-button' type='button'>MakeCall</button>
+        <br><br>
+        <input id="conversationid" style="width:300px">
+        <button id='disconnect-button' type='button'>Disconnect</button>
+    </body>
+</html>
+
+<script>
+    document.getElementById('makecall-button').addEventListener('click', makeCall);
+    document.getElementById('register-button').addEventListener('click', register);
+    document.getElementById('disconnect-button').addEventListener('click', disconnect);
+
+    // This needs to be a global since it is initialized by platformClientInit.js and utilized in app-controller.js
+    window.getCurrentUrlParams = () => {
+        let params = null;
+        const urlParts = window.location.href.split('#');
+
+        if (urlParts[1]) {
+            const urlParamsArr = urlParts[1].split('&');
+
+            if (urlParamsArr.length) {
+                params = {};
+                for (let i = 0; i < urlParamsArr.length; i++) {
+                    const currParam = urlParamsArr[i].split('=');
+                    const key = currParam[0];
+                    const value = currParam[1];
+                    params[key] = value;
+                }
+            }
+        }
+        return params;
+    }
+
+    // Genesys Cloud OAuth Info
+    // const clientId = 'ea9c71c9-79f5-4e4d-bb5f-0d291fc69a76';
+    // const redirectUri = 'https://gc-test.ga/index.html';
+    // let environment = 'apne2.pure.cloud';
+    const clientId = '';
+    const redirectUri = '';
+    let environment = 'apne2.pure.cloud';
+
+     // Set Genesys Cloud objects
+    const platformClient = require('platformClient');
+    const client = platformClient.ApiClient.instance;
+    const conversationsApi = new platformClient.ConversationsApi();
+    const notificationApi = new platformClient.NotificationsApi();
+    const userApi = new platformClient.UsersApi();
+
+    let usersMeId;
+    let topicId;
+
+    client.setEnvironment(environment);
+    client.setReturnExtendedResponses(true);
+
+    // Login & Get Users Me Info
+    document.addEventListener('DOMContentLoaded', function () {
+        client.loginImplicitGrant(clientId, redirectUri)
+            .then(() => {
+                console.log("login Succ");
+                return userApi.getUsersMe();
+            })
+            .then(function(getMeResult) {
+                console.log("GetUsersMe Succ");
+                console.log(getMeResult);
+                usersMeId = getMeResult.body.id;
+            });
+    });
+
+    // Check if there is auth info on the URL from a redirect
+    const urlParams = window.getCurrentUrlParams();
+    if (urlParams && urlParams.access_token) {
+        console.log(urlParams);
+    }
+   
+    // Get Genesys WebRTC SDK
+    const webrtcSdk = new GenesysCloudWebrtcSdk({
+        environment: 'apne2.pure.cloud',
+        accessToken: urlParams.access_token,
+    });
+
+    // Optionally set up some SDK event listeners (not an exhaustive list)
+    webrtcSdk.on('sdkError', (event) => { 
+        console.log("sdkError");
+        console.log(event);
+    });
+    webrtcSdk.on('pendingSession', (event) => {
+        console.log("pendingSession");
+        console.log(event);
+    });
+    webrtcSdk.on('sessionStarted', (event) => {
+        console.log("sessingStarted");
+        console.log(event);
+    });
+
+    webrtcSdk.initialize().then(() => {
+        // the web socket has connected and the SDK is ready to use
+        console.log('sdk.initialize()');
+    });
+
+    // MakeCall button
+    var websocketClient;
+    function makeCall() {
+        console.log('makeCall func')
+
+        conversationsApi.postConversationsCalls({
+            phoneNumber: destNum.value
+        })
+    }
+
+    // Register Button
+    function register() {
+        console.log('register func')
+
+        notificationApi.postNotificationsChannels()
+        .then((data) => {
+            console.log(`postNotificationsChannels success! data: ${JSON.stringify(data, null, 2)}`);
+            websocketClient = new WebSocket(data.body.connectUri);
+            websocketClient.onopen = function () {
+                console.log("WebSocket Open Succ. url(" + websocketClient.url + ")");
+
+                topicId = "v2.users." + usersMeId + ".conversations";
+                topic = [{ id: topicId }];
+                notificationApi.postNotificationsChannelSubscriptions(data.body.id, topic)
+                    .then((data) => {
+                        console.log(`postNotificationsChannelSubscriptions Succ. data: ${JSON.stringify(data, null, 2)}`);
+                    })
+                    .catch((err) => {
+                        console.log('There was a failure calling postNotificationsChannelSubscriptions');
+                        console.error(err);
+                    });
+
+                websocketClient.onmessage = onMessage;
+            };
+        })
+        .catch((err) => {
+            console.log('There was a failure calling postNotificationsChannels');
+            console.error(err);
+        });
+    }
+
+    // Disconnect Button
+    function disconnect() {
+        console.log('disconnect func')
+
+        document.getElementById('conversationid')
+
+        conversationsApi.postConversationDisconnect(document.getElementById('conversationid').value)
+            .then((data) => {
+                console.log(`postConversationDisconnect success! data: ${JSON.stringify(data, null, 2)}`);
+            })
+            .catch((err) => {
+                console.log('There was a failure calling postConversationDisconnect');
+                console.error(err);
+            });
+    }
+
+    // WebSocket Func
+    function onMessage(message) {
+        console.log("onMessage func");
+        console.log(message)
+
+        try {
+		// Make sure there is data in the message 
+		// (data should never be empty, but prevent parse error)
+		if (!message.data) {
+			console.warn('Message recieved, but there was no data!');
+			console.log(message);
+			return;
+		}
+
+		// Parse data into JSON object
+		var data = JSON.parse(message.data);
+
+		// Look for heartbeat
+		if (data.topicName.toLowerCase() == 'channel.metadata') {
+			console.log('THUMP thump...');
+			return;
+		}
+
+        // Conversation Event
+        if (data.topicName.toLowerCase() == topicId) {
+            let state = data.eventBody.participants[0].calls[0].state;
+            console.log(state);
+            if (state == "contacting") {
+                document.getElementById('conversationid').value = data.eventBody.id;
+            } else if (state == "terminated") {
+                document.getElementById('conversationid').value = "";
+            }
+            return;
+        }
+
+		// If we got here, the topic wasn't something we know about
+		console.warn('Unexpected notification topic: ' + data.topicName);
+	} catch(error) {
+		console.error(error);
+	}
+    }
+
+</script>

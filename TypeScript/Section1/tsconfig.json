@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "skipLibCheck": true,
-    "module": "CommonJS"
+    "strict": true,
+    "module": "ESNext",
+    "outDir": "dist",
+    "moduleDetection": "force"
   },
   "include": ["src"],
   

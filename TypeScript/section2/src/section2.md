@@ -109,3 +109,14 @@ const user3 = {
     role : Role.Guest // 2 게스트
 }
 ```
+
+
+---
+
+# Any 타입
+
+
+
+--- 
+
+# Void 타입

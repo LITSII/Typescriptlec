@@ -61,3 +61,6 @@ let programmingBook: ProgrammingBook = {
 
 //let book3 : bbugdo
 
+
+let book3: Book = programmingBook; // 앞서 만들어둔 변수
+

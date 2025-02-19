@@ -25,7 +25,7 @@ let [one, two , three] = [1, "hello", true];
 
 function func() {
 
-    return sessionStorage;
+    return "sessionStorage";
 }
 
 function func2(message = "hello") {

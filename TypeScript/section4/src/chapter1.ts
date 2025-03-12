@@ -34,3 +34,4 @@ const divide2:Operation2 = (a,b) => a/b;
 
 add2(1,2);
 add2.name
+

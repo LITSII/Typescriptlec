@@ -1,0 +1,21 @@
+{
+  "include": ["src"],
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "outDir": "dist",
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    // 전역 엄격모드
+    "strict": true,
+    "allowJs": true,
+    // 임시 null 값 검사 옵션
+    //"strictNullChecks": false
+    // 안전하지 않은 방법 이다. -> any타입에 대한 타입검사를 skip
+    //    "noImplicitAny": false,
+  },
+  "ts-node": {
+    "esm": true
+  }
+
+}
